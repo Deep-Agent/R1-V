@@ -1,6 +1,6 @@
 # R1-V: Reinforcing Super Generalization Ability in Vision Language Models with Less Than $3
 
-![image](./images/counting_star.png)
+![image](https://raw.githubusercontent.com/Deep-Agent/R1-V/main/images/counting_star.png)
 
 > ### Roadmap for R1-V
 > We are building a general framework for RLVR in VLM. We believe in the power of **trenches** and **longtermism**.
@@ -42,13 +42,13 @@
 ---
 
 
-![image](./images/ood.png)
+![image](https://raw.githubusercontent.com/Deep-Agent/R1-V/main/images/ood.png)
 
-![image](./images/super_ood.png)
+![image](https://raw.githubusercontent.com/Deep-Agent/R1-V/main/images/super_ood.png)
 
-![image](./images/training.png)
+![image](https://raw.githubusercontent.com/Deep-Agent/R1-V/main/images/training.png)
 
-![image](./images/curves.png)
+![image](https://raw.githubusercontent.com/Deep-Agent/R1-V/main/images/curves.png)
 
 
 ## Setup
@@ -96,7 +96,7 @@ torchrun --nproc_per_node="8" \
 
 ## Evaluation
 
-![image](./images/train-test.png)
+![image](https://raw.githubusercontent.com/Deep-Agent/R1-V/main/images/train-test.png)
 
 We provide the example script to evaluate OOD counting performance on a subset of SuperCLEVR within 1 minute. You can also modify the script and dataset to test on your own dataset.
 
