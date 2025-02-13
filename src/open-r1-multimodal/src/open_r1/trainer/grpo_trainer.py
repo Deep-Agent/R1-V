@@ -47,7 +47,7 @@ from trl.trainer.grpo_config import GRPOConfig
 from trl.trainer.utils import generate_model_card, get_comet_experiment_url
 
 import copy
-
+from .utils import compute_logps_with_prompt_cache
 
 if is_peft_available():
     from peft import PeftConfig, get_peft_model
@@ -334,17 +334,30 @@ class Qwen2VLGRPOTrainer(Trainer):
 
 
     # Get the per-token log probabilities for the completions for the model and the reference model
-    def _get_per_token_logps(self, model, input_ids, attention_mask, pixel_values, image_grid_thw):
-        logits = model(input_ids, attention_mask=attention_mask, pixel_values=pixel_values, image_grid_thw=image_grid_thw).logits  # (B, L, V)
-        logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
-        input_ids = input_ids[:, 1:]  # (B, L-1), exclude the first input ID since we don't have logits for it
-        # Compute the log probabilities for the input tokens. Use a loop to reduce memory peak.
+    def _get_per_token_logps(self, model, input_ids, attention_mask, pixel_values, image_grid_thw, num_logits_to_keep, mini_batch_size):
+        mini_batch_size = input_ids.size(0) if mini_batch_size == 0 else mini_batch_size
         per_token_logps = []
-        for logits_row, input_ids_row in zip(logits, input_ids):
-            log_probs = logits_row.log_softmax(dim=-1)
-            token_log_prob = torch.gather(log_probs, dim=1, index=input_ids_row.unsqueeze(1)).squeeze(1)
+
+        for i in range(0, input_ids.size(0), mini_batch_size):
+            mini_batch_input_ids = input_ids[i : i + mini_batch_size, :]  # (B_mini, P+C)
+            mini_batch_attention_mask = attention_mask[i : i + mini_batch_size, :]  # (B_mini, P+C)
+            mini_pixel_values = pixel_values[i : i + mini_batch_size, :]
+            mini_image_grid_thw = image_grid_thw[i : i + mini_batch_size, :]
+            logits = model(
+                input_ids=mini_batch_input_ids,
+                attention_mask=mini_batch_attention_mask,
+                pixel_values=mini_pixel_values, 
+                image_grid_thw=mini_image_grid_thw,
+                # num_logits_to_keep=num_logits_to_keep + 1,
+            ).logits[:, -num_logits_to_keep - 1 : -1]  # (B_mini, P+C, Vocab_size)
+
+            token_index = mini_batch_input_ids[:, -num_logits_to_keep:].unsqueeze(-1)  # (B_mini, P+C, 1)
+            token_logits = torch.gather(logits, dim=-1, index=token_index).squeeze(-1)
+            logsumexp_values = torch.stack([torch.logsumexp(l, dim=-1) for l in logits])
+            del logits
+            token_log_prob = token_logits - logsumexp_values
             per_token_logps.append(token_log_prob)
-        return torch.stack(per_token_logps)
+        return torch.cat(per_token_logps, dim=0)
 
 
     # Trainer "prepares" the inputs before calling `compute_loss`. It converts to tensor and move to device.
@@ -388,7 +401,6 @@ class Qwen2VLGRPOTrainer(Trainer):
             prompt_length = prompt_ids.size(1)
             prompt_ids = prompt_completion_ids[:, :prompt_length]
             completion_ids = prompt_completion_ids[:, prompt_length:]
-            prompt_mask = prompt_mask.repeat_interleave(self.num_generations, dim=0)
 
         # Mask everything after the first EOS token
         is_eos = completion_ids == self.processing_class.eos_token_id
@@ -406,14 +418,73 @@ class Qwen2VLGRPOTrainer(Trainer):
         per_token_logps = self._get_per_token_logps(model, prompt_completion_ids, attention_mask, pixel_values, image_grid_thw)
         # Get rid of the prompt (-1 because of the shift done in get_per_token_logps)
         per_token_logps = per_token_logps[:, prompt_length - 1 :]
+        
+        mini_batch_size = self.args.logit_computation_mini_batch_size if logit_computation_mini_batch_size in self.args else 1  # need newest trl
 
-        with torch.inference_mode():
+        if not self.gradient_checkpointing:  # unchecked, since the issues about gradient_checkpointing unsolved : https://github.com/Deep-Agent/R1-V/issues/31
+            # Current policy logprobs (with grad)
+            per_token_logps = compute_logps_with_prompt_cache(
+                model=model,
+                prompt_inputs=prompt_inputs,
+                completion_ids=completion_ids,
+                mini_batch_size=mini_batch_size,
+                requires_grad_for_completion=True,
+            )
             if self.ref_model is not None:
-                ref_per_token_logps = self._get_per_token_logps(self.ref_model, prompt_completion_ids, attention_mask, pixel_values, image_grid_thw)
+                ref_per_token_logps = compute_logps_with_prompt_cache(
+                    model=self.ref_model,
+                    prompt_inputs=prompt_inputs,
+                    completion_ids=completion_ids,
+                    mini_batch_size=mini_batch_size,
+                    requires_grad_for_completion=False,
+                )
             else:
                 with self.accelerator.unwrap_model(model).disable_adapter():
-                    ref_per_token_logps = self._get_per_token_logps(model, prompt_completion_ids, attention_mask, pixel_values, image_grid_thw)
-        ref_per_token_logps = ref_per_token_logps[:, prompt_length - 1 :]
+                    ref_per_token_logps = compute_logps_with_prompt_cache(
+                        model=model,
+                        prompt_inputs=prompt_inputs,
+                        completion_ids=completion_ids,
+                        mini_batch_size=mini_batch_size,
+                        requires_grad_for_completion=False,
+                    )
+        else:
+            pixel_values = prompt_inputs["pixel_values"].repeat_interleave(self.num_generations, dim=0).view(-1, pixel_values.shape[-1])
+            image_grid_thw = prompt_inputs["image_grid_thw"].repeat_interleave(self.num_generations, dim=0)
+            # Concatenate prompt_mask with completion_mask for logit computation
+            prompt_mask_repeated = prompt_inputs["attention_mask"].repeat_interleave(self.num_generations, dim=0)
+            attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B*G, P+C)
+
+            num_logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+            per_token_logps = self._get_per_token_logps(
+                model=model,
+                input_ids=prompt_completion_ids,
+                attention_mask=attention_mask,
+                num_logits_to_keep=num_logits_to_keep,
+                mini_batch_size=mini_batch_size,
+            )
+        
+            with torch.inference_mode():
+                if self.ref_model is not None:
+                    ref_per_token_logps = self._get_per_token_logps(
+                        model=self.ref_model, 
+                        input_ids=prompt_completion_ids, 
+                        attention_mask=attention_mask, 
+                        pixel_values=pixel_values, 
+                        image_grid_thw=image_grid_thw,
+                        num_logits_to_keep=num_logits_to_keep,
+                        mini_batch_size=mini_batch_size,
+                    )
+                else:
+                    with self.accelerator.unwrap_model(model).disable_adapter():
+                        ref_per_token_logps = self._get_per_token_logps(
+                            model=model,
+                            input_ids=prompt_completion_ids,
+                            attention_mask=attention_mask,
+                            pixel_values=pixel_values, 
+                            image_grid_thw=image_grid_thw,
+                            num_logits_to_keep=num_logits_to_keep,
+                            mini_batch_size=mini_batch_size,
+                        )
 
         # Compute the KL divergence between the model and the reference model
         per_token_kl = torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
