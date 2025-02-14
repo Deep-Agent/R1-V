@@ -369,7 +369,7 @@ class Qwen2VLGRPOTrainer(Trainer):
         if return_outputs:
             raise ValueError("The GRPOTrainer does not support returning outputs")
     
-        mini_batch_size = self.args.logit_computation_mini_batch_size if hasattr(self.args, 'logit_computation_mini_batch_size') else 4  # need newest trl
+        mini_batch_size = self.args.logit_computation_mini_batch_size if hasattr(self.args, 'logit_computation_mini_batch_size') else 1  # need newest trl
 
         prompts = [x["prompt"] for x in inputs]
         prompts_text = [maybe_apply_chat_template(example, self.processing_class)["prompt"] for example in inputs]
@@ -384,36 +384,16 @@ class Qwen2VLGRPOTrainer(Trainer):
         )
         prompt_inputs = super()._prepare_inputs(prompt_inputs)
 
-        prompt_ids, prompt_mask = prompt_inputs["input_ids"], prompt_inputs["attention_mask"]
-        pixel_values = prompt_inputs["pixel_values"]
-        image_grid_thw = prompt_inputs["image_grid_thw"]
-
-        
         if self.max_prompt_length is not None:
-            prompt_ids = prompt_ids[:, -self.max_prompt_length :]
-            prompt_mask = prompt_mask[:, -self.max_prompt_length :]
+            prompt_inputs["input_ids"] = prompt_inputs["input_ids"][:, -self.max_prompt_length :]
+            prompt_inputs["attention_mask"] = prompt_inputs["attention_mask"][:, -self.max_prompt_length :]
 
         # Generate completions
         with unwrap_model_for_generation(model, self.accelerator) as unwrapped_model:
             prompt_completion_ids = unwrapped_model.generate(**prompt_inputs, generation_config=self.generation_config)
 
-            prompt_length = prompt_ids.size(1)
-            prompt_ids = prompt_completion_ids[:, :prompt_length]
-            completion_ids = prompt_completion_ids[:, prompt_length:]
-            prompt_mask = prompt_mask.repeat_interleave(self.num_generations, dim=0)
-
-        # Mask everything after the first EOS token
-        is_eos = completion_ids == self.processing_class.eos_token_id
-        device = self.accelerator.device
-        eos_idx = torch.full((is_eos.size(0),), is_eos.size(1), dtype=torch.long, device=device)
-        eos_idx[is_eos.any(dim=1)] = is_eos.int().argmax(dim=1)[is_eos.any(dim=1)]
-        sequence_indices = torch.arange(is_eos.size(1), device=device).expand(is_eos.size(0), -1)
-        completion_mask = (sequence_indices <= eos_idx.unsqueeze(1)).int()
-
-        # Concatenate prompt_mask with completion_mask for logit computation
-        attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B*G, P+C)
-        pixel_values = prompt_inputs["pixel_values"].repeat(self.num_generations, 1)
-        image_grid_thw = prompt_inputs["image_grid_thw"].repeat_interleave(self.num_generations, dim=0)
+        prompt_length = prompt_ids.size(1)
+        completion_ids = prompt_completion_ids[:, prompt_length:]
 
         if not self.gradient_checkpointing:
             # Current policy logprobs (with grad)
@@ -442,7 +422,22 @@ class Qwen2VLGRPOTrainer(Trainer):
                         requires_grad_for_completion=False,
                     )
         else: # unchecked, since the issues about gradient_checkpointing unsolved : https://github.com/Deep-Agent/R1-V/issues/31
+            # Mask everything after the first EOS token
+            is_eos = completion_ids == self.processing_class.eos_token_id
+            device = self.accelerator.device
+            eos_idx = torch.full((is_eos.size(0),), is_eos.size(1), dtype=torch.long, device=device)
+            eos_idx[is_eos.any(dim=1)] = is_eos.int().argmax(dim=1)[is_eos.any(dim=1)]
+            sequence_indices = torch.arange(is_eos.size(1), device=device).expand(is_eos.size(0), -1)
+            completion_mask = (sequence_indices <= eos_idx.unsqueeze(1)).int()
+            
+            prompt_mask = prompt_mask.repeat_interleave(self.num_generations, dim=0)
             num_logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
+
+            # Concatenate prompt_mask with completion_mask for logit computation
+            attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B*G, P+C)
+            pixel_values = prompt_inputs["pixel_values"].repeat(self.num_generations, 1)
+            image_grid_thw = prompt_inputs["image_grid_thw"].repeat_interleave(self.num_generations, dim=0)
+            
             per_token_logps = self._get_per_token_logps(
                 model=model,
                 input_ids=prompt_completion_ids,
