@@ -165,7 +165,7 @@ class Qwen2VLGRPOTrainer(Trainer):
             model_name = model if isinstance(model, str) else model.config._name_or_path
             model_name = model_name.split("/")[-1]
             args = GRPOConfig(f"{model_name}-GRPO")
-
+        self.gradient_checkpointing = False
         # Models
         # Trained model
         model_init_kwargs = args.model_init_kwargs or {}
@@ -369,7 +369,7 @@ class Qwen2VLGRPOTrainer(Trainer):
         if return_outputs:
             raise ValueError("The GRPOTrainer does not support returning outputs")
     
-        
+        mini_batch_size = self.args.logit_computation_mini_batch_size if hasattr(self.args, 'logit_computation_mini_batch_size') else 4  # need newest trl
 
         prompts = [x["prompt"] for x in inputs]
         prompts_text = [maybe_apply_chat_template(example, self.processing_class)["prompt"] for example in inputs]
@@ -400,6 +400,7 @@ class Qwen2VLGRPOTrainer(Trainer):
             prompt_length = prompt_ids.size(1)
             prompt_ids = prompt_completion_ids[:, :prompt_length]
             completion_ids = prompt_completion_ids[:, prompt_length:]
+            prompt_mask = prompt_mask.repeat_interleave(self.num_generations, dim=0)
 
         # Mask everything after the first EOS token
         is_eos = completion_ids == self.processing_class.eos_token_id
@@ -414,13 +415,7 @@ class Qwen2VLGRPOTrainer(Trainer):
         pixel_values = prompt_inputs["pixel_values"].repeat(self.num_generations, 1)
         image_grid_thw = prompt_inputs["image_grid_thw"].repeat_interleave(self.num_generations, dim=0)
 
-        per_token_logps = self._get_per_token_logps(model, prompt_completion_ids, attention_mask, pixel_values, image_grid_thw)
-        # Get rid of the prompt (-1 because of the shift done in get_per_token_logps)
-        per_token_logps = per_token_logps[:, prompt_length - 1 :]
-        
-        mini_batch_size = self.args.logit_computation_mini_batch_size if logit_computation_mini_batch_size in self.args else 1  # need newest trl
-
-        if not self.gradient_checkpointing:  # unchecked, since the issues about gradient_checkpointing unsolved : https://github.com/Deep-Agent/R1-V/issues/31
+        if not self.gradient_checkpointing:
             # Current policy logprobs (with grad)
             per_token_logps = compute_logps_with_prompt_cache(
                 model=model,
@@ -446,13 +441,7 @@ class Qwen2VLGRPOTrainer(Trainer):
                         mini_batch_size=mini_batch_size,
                         requires_grad_for_completion=False,
                     )
-        else:
-            pixel_values = prompt_inputs["pixel_values"].repeat_interleave(self.num_generations, dim=0).view(-1, pixel_values.shape[-1])
-            image_grid_thw = prompt_inputs["image_grid_thw"].repeat_interleave(self.num_generations, dim=0)
-            # Concatenate prompt_mask with completion_mask for logit computation
-            prompt_mask_repeated = prompt_inputs["attention_mask"].repeat_interleave(self.num_generations, dim=0)
-            attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B*G, P+C)
-
+        else: # unchecked, since the issues about gradient_checkpointing unsolved : https://github.com/Deep-Agent/R1-V/issues/31
             num_logits_to_keep = completion_ids.size(1)  # we only need to compute the logits for the completion tokens
             per_token_logps = self._get_per_token_logps(
                 model=model,
