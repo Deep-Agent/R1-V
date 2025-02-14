@@ -395,7 +395,6 @@ class Qwen2VLGRPOTrainer(Trainer):
 
         # Generate completions
         with unwrap_model_for_generation(model, self.accelerator) as unwrapped_model:
-            prompt_inputs['pixel_values'] = prompt_inputs['pixel_values'][None]
             prompt_completion_ids = unwrapped_model.generate(**prompt_inputs, generation_config=self.generation_config)
 
             prompt_length = prompt_ids.size(1)
@@ -412,7 +411,7 @@ class Qwen2VLGRPOTrainer(Trainer):
 
         # Concatenate prompt_mask with completion_mask for logit computation
         attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B*G, P+C)
-        pixel_values = prompt_inputs["pixel_values"].repeat_interleave(self.num_generations, dim=0).view(-1, pixel_values.shape[-1])
+        pixel_values = prompt_inputs["pixel_values"].repeat(self.num_generations, 1)
         image_grid_thw = prompt_inputs["image_grid_thw"].repeat_interleave(self.num_generations, dim=0)
 
         per_token_logps = self._get_per_token_logps(model, prompt_completion_ids, attention_mask, pixel_values, image_grid_thw)

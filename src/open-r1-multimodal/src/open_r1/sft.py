@@ -261,8 +261,7 @@ def main(script_args, training_args, model_args):
         eval_dataset=dataset[script_args.dataset_test_split] if training_args.eval_strategy != "no" else None,
         processing_class=processor.tokenizer,
         data_collator=collate_fn,
-        peft_config=get_peft_config(model_args),
-        callbacks=[],
+        peft_config=get_peft_config(model_args)
     )
 
     ###############
@@ -286,13 +285,12 @@ def main(script_args, training_args, model_args):
     ##################################
     logger.info("*** Save model ***")
     trainer.save_model(training_args.output_dir)
+    processor.save_pretrained(training_args.output_dir)
     logger.info(f"Model saved to {training_args.output_dir}")
 
     # Save everything else on main process
     kwargs = {
-        "finetuned_from": model_args.model_name_or_path,
-        "dataset": list(script_args.dataset_name),
-        "dataset_tags": list(script_args.dataset_name),
+        "dataset_name": script_args.dataset_name,
         "tags": ["R1-V"],
     }
     if trainer.accelerator.is_main_process:
@@ -307,6 +305,7 @@ def main(script_args, training_args, model_args):
     if training_args.push_to_hub:
         logger.info("Pushing to hub...")
         trainer.push_to_hub(**kwargs)
+        processor.push_to_hub(training_args.hub_model_id)
 
 
 
