@@ -392,7 +392,7 @@ class Qwen2VLGRPOTrainer(Trainer):
         with unwrap_model_for_generation(model, self.accelerator) as unwrapped_model:
             prompt_completion_ids = unwrapped_model.generate(**prompt_inputs, generation_config=self.generation_config)
 
-        prompt_length = prompt_ids.size(1)
+        prompt_length = prompt_inputs["input_ids"].size(1)
         completion_ids = prompt_completion_ids[:, prompt_length:]
 
         if not self.gradient_checkpointing:
