@@ -394,7 +394,8 @@ class Qwen2VLGRPOTrainer(Trainer):
 
         prompt_length = prompt_inputs["input_ids"].size(1)
         completion_ids = prompt_completion_ids[:, prompt_length:]
-
+        device = self.accelerator.device
+        
         if not self.gradient_checkpointing:
             # Current policy logprobs (with grad)
             per_token_logps = compute_logps_with_prompt_cache(
@@ -424,7 +425,6 @@ class Qwen2VLGRPOTrainer(Trainer):
         else: # unchecked, since the issues about gradient_checkpointing unsolved : https://github.com/Deep-Agent/R1-V/issues/31
             # Mask everything after the first EOS token
             is_eos = completion_ids == self.processing_class.eos_token_id
-            device = self.accelerator.device
             eos_idx = torch.full((is_eos.size(0),), is_eos.size(1), dtype=torch.long, device=device)
             eos_idx[is_eos.any(dim=1)] = is_eos.int().argmax(dim=1)[is_eos.any(dim=1)]
             sequence_indices = torch.arange(is_eos.size(1), device=device).expand(is_eos.size(0), -1)
