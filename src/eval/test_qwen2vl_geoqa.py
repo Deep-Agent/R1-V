@@ -7,10 +7,10 @@ import re
 from math_verify import parse, verify
 
 
-MODEL_PATH="<MODEL_PATH>" # qwen2vl model or grpoed model on geoqa train
+MODEL_PATH="checkpoints/Qwen/Qwen2-VL-2B-Instruct" # qwen2vl model or grpoed model on geoqa train
 BSZ=50 # reduce it if GPU OOM
-OUTPUT_PATH="<OUTPUT_LOG>"
-PROMPT_PATH="./prompts/geoqa_test_prompts.jsonl"
+OUTPUT_PATH="./output/train@geo170k/eval/res@checkpoint-30.json"
+PROMPT_PATH="./src/eval/prompts/geoqa_test_prompts.jsonl"
 
 #We recommend enabling flash_attention_2 for better acceleration and memory saving, especially in multi-image and video scenarios.
 model = Qwen2VLForConditionalGeneration.from_pretrained(
@@ -32,8 +32,6 @@ with open(PROMPT_PATH, "r") as f:
 QUESTION_TEMPLATE = "{Question} Output the thinking process in <think> </think> and final answer (number) in <answer> </answer> tags."
 
 messages = []
-
-data = data
 
 for i in data:
     message = [{
