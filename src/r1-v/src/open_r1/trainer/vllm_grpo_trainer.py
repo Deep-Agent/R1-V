@@ -371,7 +371,7 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
             if self.accelerator.is_main_process:
                 vllm_device = self.args.vllm_device
                 if vllm_device == "auto":
-                    vllm_device = f"cuda:{self.accelerator.num_processes - 1}"   # take the next GPU idx
+                    vllm_device = f"cuda:{self.accelerator.num_processes}"  # take the next GPU idx
                 # Check that the requested device is available
                 if (
                     vllm_device.split(":")[0] == "cuda"
@@ -486,8 +486,12 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
             pixel_values=pixel_values,
             image_grid_thw=image_grid_thw,
         ).logits  # (B, L, V)
-        logits = logits[:, :-1, :]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
-        input_ids = input_ids[:, -logits_to_keep:]  # (B, L-1), exclude the first input ID since we don't have logits for it
+        logits = logits[
+            :, :-1, :
+        ]  # (B, L-1, V), exclude the last logit: it corresponds to the next token pred
+        input_ids = input_ids[
+            :, -logits_to_keep:
+        ]  # (B, L-1), exclude the first input ID since we don't have logits for it
         # Compute the log probabilities for the input tokens. Use a loop to reduce memory peak.
         logits = logits[:, -logits_to_keep:]
         per_token_logps = []
