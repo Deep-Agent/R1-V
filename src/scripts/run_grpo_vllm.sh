@@ -10,7 +10,7 @@ QWEN_PATH=checkpoints/Qwen/VL/Qwen2-VL-2B-Instruct
 HF_DATASET=playground/Clevr_CoGenT_TrainA_70K_Complex
 
 OUTPUT_DIR=outputs
-export LOG_PATH="./vllm_run_2.txt"
+export LOG_PATH="./logs/vllm_run_2.txt"
 RUN_NAME=r1v_test_2
 
 # NOTE: you are expected to use X + 1 cards for X training proc and 1 vLLM proc 
