@@ -7,4 +7,4 @@ playground
 wandb
 vllm_run.txt
 
-src/scripts/test_grpo_geoqa_multigpu.sh
+src/scripts
