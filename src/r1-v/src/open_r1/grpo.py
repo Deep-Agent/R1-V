@@ -14,16 +14,22 @@
 
 import os
 import re
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional
 
 from datasets import load_dataset, load_from_disk
-from transformers import Qwen2VLForConditionalGeneration
-
 from math_verify import parse, verify
 from open_r1.trainer import Qwen2VLGRPOTrainer, Qwen2VLGRPOVLLMTrainer
-from trl import GRPOConfig, GRPOTrainer, ModelConfig, ScriptArguments, TrlParser, get_peft_config
+from transformers import Qwen2VLForConditionalGeneration
+from trl import (
+    GRPOConfig,
+    GRPOTrainer,
+    ModelConfig,
+    ScriptArguments,
+    TrlParser,
+    get_peft_config,
+)
 
 
 @dataclass

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import textwrap
 from collections import defaultdict
@@ -32,22 +33,26 @@ from transformers import (
     GenerationConfig,
     PreTrainedModel,
     PreTrainedTokenizerBase,
-    Qwen2VLForConditionalGeneration,
     Qwen2_5_VLForConditionalGeneration,
+    Qwen2VLForConditionalGeneration,
     Trainer,
     TrainerCallback,
     is_wandb_available,
 )
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.utils import is_peft_available
-
-from trl.data_utils import apply_chat_template, is_conversational, maybe_apply_chat_template
-from trl.models import create_reference_model, prepare_deepspeed, unwrap_model_for_generation
+from trl.data_utils import (
+    apply_chat_template,
+    is_conversational,
+    maybe_apply_chat_template,
+)
+from trl.models import (
+    create_reference_model,
+    prepare_deepspeed,
+    unwrap_model_for_generation,
+)
 from trl.trainer.grpo_config import GRPOConfig
 from trl.trainer.utils import generate_model_card, get_comet_experiment_url
-
-import copy
-
 
 if is_peft_available():
     from peft import PeftConfig, get_peft_model
