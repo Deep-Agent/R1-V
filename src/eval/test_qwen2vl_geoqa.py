@@ -7,10 +7,11 @@ import re
 from math_verify import parse, verify
 
 
-MODEL_PATH="checkpoints/Qwen/Qwen2-VL-2B-Instruct" # qwen2vl model or grpoed model on geoqa train
-BSZ=50 # reduce it if GPU OOM
-OUTPUT_PATH="./output/train@geo170k/eval/res@checkpoint-30.json"
-PROMPT_PATH="./src/eval/prompts/geoqa_test_prompts.jsonl"
+MODEL_PATH = "checkpoints/Qwen/VL/Qwen2-VL-2B-Instruct" # qwen2vl model or grpoed model on geoqa train
+BSZ = 50 # reduce it if GPU OOM
+OUTPUT_PATH = "./output/train@geo170k/eval/res@checkpoint-30.json"
+PROMPT_PATH = "./src/eval/prompts/geoqa_test_prompts.jsonl"
+IMAGE_ROOT = "./playground"
 
 #We recommend enabling flash_attention_2 for better acceleration and memory saving, especially in multi-image and video scenarios.
 model = Qwen2VLForConditionalGeneration.from_pretrained(
@@ -39,7 +40,7 @@ for i in data:
         "content": [
             {
                 "type": "image", 
-                "image": f"file://{i['image_path']}"
+                "image": f"file://{IMAGE_ROOT}/{i['image_path'][2:]}"
             },
             {
                 "type": "text",
