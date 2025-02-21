@@ -65,7 +65,7 @@ def init_model(model_path, gpu_id):
     model = Qwen2VLForConditionalGeneration.from_pretrained(
         model_path,
         torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
+        attn_implementation="sdpa",
         device_map=f"cuda:{gpu_id}",
     )
 

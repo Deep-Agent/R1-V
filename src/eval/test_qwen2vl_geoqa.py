@@ -1,11 +1,11 @@
-from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
-from qwen_vl_utils import process_vision_info
-import torch
 import json
-from tqdm import tqdm
 import re
-from math_verify import parse, verify
 
+import torch
+from math_verify import parse, verify
+from qwen_vl_utils import process_vision_info
+from tqdm import tqdm
+from transformers import AutoProcessor, AutoTokenizer, Qwen2VLForConditionalGeneration
 
 MODEL_PATH = "checkpoints/Qwen/VL/Qwen2-VL-2B-Instruct" # qwen2vl model or grpoed model on geoqa train
 BSZ = 50 # reduce it if GPU OOM
@@ -17,7 +17,7 @@ IMAGE_ROOT = "./playground"
 model = Qwen2VLForConditionalGeneration.from_pretrained(
     MODEL_PATH,
     torch_dtype=torch.bfloat16,
-    attn_implementation="flash_attention_2",
+    attn_implementation="sdpa",
     device_map="auto",
 )
 
