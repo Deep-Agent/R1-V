@@ -19,6 +19,7 @@ def get_eval_config():
     parser.add_argument("--batch_size", default=4, type=int, help="Batch size for inference. Reduce if GPU OOM (default: 50).")
     parser.add_argument("--output_path", required=True, type=str, help="Path to save inference result (e.g., JSON file).")
     parser.add_argument("--prompt_path", required=True, type=str, help="Path to the prompts JSONL file for GeoQA evaluation.")
+    parser.add_argument("--image_root", required=True, type=str, help="Path to the prompts JSONL file for GeoQA evaluation.")
     all_gpu = ",".join(map(str, range(torch.cuda.device_count())))
     parser.add_argument("--gpu_ids", default=all_gpu, help="comma-separated list of GPU IDs to use")
     args = parser.parse_args()
@@ -27,7 +28,7 @@ def get_eval_config():
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # >>>>>>>>>> 2. load testset <<<<<<<<<<<<<
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-def prepare_test_messages(testset_path):
+def prepare_test_messages(testset_path, image_root):
     testset_data = pd.read_json(testset_path, lines=True).to_dict(orient="records")
     QUESTION_TEMPLATE = "{Question} Output the thinking process in <think> </think> and final answer (number) in <answer> </answer> tags."
     tested_messages = []
@@ -37,7 +38,7 @@ def prepare_test_messages(testset_path):
             "content": [
                 {
                     "type": "image", 
-                    "image": f"file://{i['image_path']}"
+                    "image": f"file://{image_root}/{i['image_path'][2:]}"
                 },
                 {
                     "type": "text",
@@ -199,7 +200,7 @@ def compute_metrics(testset_data, all_predicts):
 
 if __name__ == "__main__":
     args = get_eval_config()
-    testset_data, tested_messages = prepare_test_messages(testset_path=args.prompt_path)
+    testset_data, tested_messages = prepare_test_messages(testset_path=args.prompt_path, image_root=args.image_root)
     all_predicts = multi_gpu_inference(tested_messages, args.gpu_ids, args.model_path, args.batch_size)
     compute_metrics(testset_data, all_predicts)
 
