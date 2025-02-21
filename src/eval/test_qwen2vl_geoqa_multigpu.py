@@ -1,13 +1,16 @@
-from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
-from qwen_vl_utils import process_vision_info
-import torch
+import argparse
 import json
+import os
+
+import pandas as pd
+import torch
 import tqdm
 from math_verify import parse, verify
-import argparse
-import pandas as pd
-from torch.multiprocessing import Process, set_start_method, Manager
+from qwen_vl_utils import process_vision_info
+from torch.multiprocessing import Manager, Process, set_start_method
+from transformers import AutoProcessor, AutoTokenizer, Qwen2VLForConditionalGeneration
 from transformers.utils.logging import disable_progress_bar
+
 disable_progress_bar()
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -188,6 +191,7 @@ def compute_metrics(testset_data, all_predicts):
     print(f"\nAccuracy: {accuracy:.2f}%")
 
     # Save results to a JSON file
+    os.mkdirs(args.output_path, exist_ok=True)
     with open(args.output_path, "w") as f:
         json.dump({
             'accuracy': accuracy,
