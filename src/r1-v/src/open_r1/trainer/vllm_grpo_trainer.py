@@ -12,17 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import textwrap
+import warnings
 from collections import defaultdict
 from typing import Any, Callable, Optional, Union
-from accelerate.utils.other import is_compiled_module
-from accelerate.utils import broadcast_object_list, gather, gather_object
+from unittest.mock import patch
+
 import torch
 import torch.utils.data
 import transformers
-import warnings
-from unittest.mock import patch
+from accelerate.utils import broadcast_object_list, gather, gather_object
+from accelerate.utils.other import is_compiled_module
 from datasets import Dataset, IterableDataset
 from packaging import version
 from transformers import (
@@ -35,22 +37,21 @@ from transformers import (
     GenerationConfig,
     PreTrainedModel,
     PreTrainedTokenizerBase,
-    Qwen2VLForConditionalGeneration,
     Qwen2_5_VLForConditionalGeneration,
+    Qwen2VLForConditionalGeneration,
     Trainer,
     TrainerCallback,
     is_wandb_available,
 )
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.utils import is_peft_available
-
+from trl import GRPOTrainer
 from trl.data_utils import (
     apply_chat_template,
     is_conversational,
     maybe_apply_chat_template,
 )
 from trl.import_utils import is_vllm_available
-
 from trl.models import (
     create_reference_model,
     prepare_deepspeed,
@@ -58,9 +59,6 @@ from trl.models import (
 )
 from trl.trainer.grpo_config import GRPOConfig
 from trl.trainer.utils import generate_model_card, get_comet_experiment_url, pad
-from trl import GRPOTrainer
-
-import copy
 
 if is_peft_available():
     from peft import PeftConfig, get_peft_model
@@ -71,6 +69,7 @@ if is_vllm_available():
 
 if is_wandb_available():
     import wandb
+
 import torch.nn as nn
 from torch.utils.data import Sampler
 
@@ -167,24 +166,14 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
                     f"a `torch.dtype` (e.g., 'float32'), but got {torch_dtype}."
                 )
             # Disable caching if gradient checkpointing is enabled (not supported)
-            model_init_kwargs["use_cache"] = (
-                False
-                if args.gradient_checkpointing
-                else model_init_kwargs.get("use_cache")
-            )
+            model_init_kwargs["use_cache"] = (False if args.gradient_checkpointing else model_init_kwargs.get("use_cache"))
             if "Qwen2-VL" in model_id:
-                model = Qwen2VLForConditionalGeneration.from_pretrained(
-                    model, **model_init_kwargs
-                )
+                model = Qwen2VLForConditionalGeneration.from_pretrained(model, **model_init_kwargs)
             elif "Qwen2.5-VL" in model_id:
-                model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                    model, **model_init_kwargs
-                )
+                model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model, **model_init_kwargs)
             elif "Aria" in model_id:
                 model_init_kwargs.pop("use_cache")
-                model = AriaForConditionalGeneration.from_pretrained(
-                    model, **model_init_kwargs
-                )
+                model = AriaForConditionalGeneration.from_pretrained(model, **model_init_kwargs)
             else:
                 model = AutoModelForCausalLM.from_pretrained(model, **model_init_kwargs)
         else:
@@ -201,21 +190,13 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
         # Reference model
         if is_deepspeed_zero3_enabled():
             if "Qwen2-VL" in model_id:
-                self.ref_model = Qwen2VLForConditionalGeneration.from_pretrained(
-                    model_id, **model_init_kwargs
-                )
+                self.ref_model = Qwen2VLForConditionalGeneration.from_pretrained(model_id, **model_init_kwargs)
             elif "Qwen2.5-VL" in model_id:
-                self.ref_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                    model_id, **model_init_kwargs
-                )
+                self.ref_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_id, **model_init_kwargs)
             elif "Aria" in model_id:
-                self.ref_model = AriaForConditionalGeneration.from_pretrained(
-                    model_id, **model_init_kwargs
-                )
+                self.ref_model = AriaForConditionalGeneration.from_pretrained(model_id, **model_init_kwargs)
             else:
-                self.ref_model = AutoModelForCausalLM.from_pretrained(
-                    model_id, **model_init_kwargs
-                )
+                self.ref_model = AutoModelForCausalLM.from_pretrained(model_id, **model_init_kwargs)
         elif peft_config is None:
             # If PEFT configuration is not provided, create a reference model based on the initial model.
             self.ref_model = create_reference_model(model)
@@ -235,9 +216,7 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
                     processing_class.image_processor.max_pixels = max_pixels
                     processing_class.image_processor.min_pixels = min_pixels
             else:
-                processing_class = AutoTokenizer.from_pretrained(
-                    model.config._name_or_path, padding_side="left"
-                )
+                processing_class = AutoTokenizer.from_pretrained(model.config._name_or_path, padding_side="left")
                 pad_token_id = processing_class.pad_token_id
 
         # Reward functions
@@ -245,9 +224,7 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
             reward_funcs = [reward_funcs]
         for i, reward_func in enumerate(reward_funcs):
             if isinstance(reward_func, str):
-                reward_funcs[i] = AutoModelForSequenceClassification.from_pretrained(
-                    reward_func, num_labels=1, **model_init_kwargs
-                )
+                reward_funcs[i] = AutoModelForSequenceClassification.from_pretrained(reward_func, num_labels=1, **model_init_kwargs)
         self.reward_funcs = reward_funcs
 
         # Reward processing class
@@ -261,9 +238,7 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
                     "The number of reward processing classes must match the number of reward functions."
                 )
 
-        for i, (reward_processing_class, reward_func) in enumerate(
-            zip(reward_processing_classes, reward_funcs)
-        ):
+        for i, (reward_processing_class, reward_func) in enumerate(zip(reward_processing_classes, reward_funcs)):
             if isinstance(reward_func, PreTrainedModel):
                 if reward_processing_class is None:
                     reward_processing_class = AutoTokenizer.from_pretrained(
@@ -544,19 +519,14 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
         if self.args.use_vllm:
             # First, have main process load weights if needed
             if self.state.global_step != self._last_loaded_step:
-                with unwrap_model_for_generation(
-                    self.model,
-                    self.accelerator,
-                    gather_deepspeed3_params=False,  # TODO: fix this, self.args.ds3_gather_for_generation,
-                ) as unwrapped_model:
+                # TODO: fix this, self.args.ds3_gather_for_generation,
+                with unwrap_model_for_generation(self.model, self.accelerator,gather_deepspeed3_params=False) as unwrapped_model:
                     if is_compiled_module(unwrapped_model):
                         state_dict = unwrapped_model._orig_mod.state_dict()
                     else:
                         state_dict = unwrapped_model.state_dict()
                 if self.accelerator.is_main_process:
-                    llm_model = (
-                        self.llm.llm_engine.model_executor.driver_worker.model_runner.model
-                    )
+                    llm_model = (self.llm.llm_engine.model_executor.driver_worker.model_runner.model)
                     llm_model.load_weights(state_dict.items())
                 self._last_loaded_step = self.state.global_step
 
@@ -564,10 +534,7 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
             all_prompts_text = gather_object(prompts_text)
             all_images = gather_object(images)
             # group into pairs
-            all_multimodal_inputs = [
-                {"prompt": p, "multi_modal_data": {"image": i}}
-                for p, i in zip(all_prompts_text, all_images)
-            ]
+            all_multimodal_inputs = [{"prompt": p, "multi_modal_data": {"image": i}} for p, i in zip(all_prompts_text, all_images)]
 
             if self.accelerator.is_main_process:
                 outputs = self.llm.generate(
@@ -590,12 +557,8 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
             completion_ids = completion_ids[process_slice]
 
             # Pad the completions, and concatenate them with the prompts
-            completion_ids = [
-                torch.tensor(ids, device=device) for ids in completion_ids
-            ]
-            completion_ids = pad(
-                completion_ids, padding_value=self.processing_class.pad_token_id
-            )
+            completion_ids = [torch.tensor(ids, device=device) for ids in completion_ids]
+            completion_ids = pad(completion_ids, padding_value=self.processing_class.pad_token_id)
             prompt_completion_ids = torch.cat([prompt_ids, completion_ids], dim=1)
         else:
             raise ValueError("Only vLLM generation is supported in this version ")
@@ -604,13 +567,9 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
         # Mask everything after the first EOS token
         is_eos = completion_ids == self.processing_class.eos_token_id
         device = self.accelerator.device
-        eos_idx = torch.full(
-            (is_eos.size(0),), is_eos.size(1), dtype=torch.long, device=device
-        )
+        eos_idx = torch.full((is_eos.size(0),), is_eos.size(1), dtype=torch.long, device=device)
         eos_idx[is_eos.any(dim=1)] = is_eos.int().argmax(dim=1)[is_eos.any(dim=1)]
-        sequence_indices = torch.arange(is_eos.size(1), device=device).expand(
-            is_eos.size(0), -1
-        )
+        sequence_indices = torch.arange(is_eos.size(1), device=device).expand(is_eos.size(0), -1)
         completion_mask = (sequence_indices <= eos_idx.unsqueeze(1)).int()
 
         # Concatenate prompt_mask with completion_mask for logit computation
@@ -651,14 +610,9 @@ class Qwen2VLGRPOVLLMTrainer(Trainer):
                     )
 
         # Decode the generated completions
-        completions = self.processing_class.batch_decode(
-            completion_ids, skip_special_tokens=True
-        )
+        completions = self.processing_class.batch_decode(completion_ids, skip_special_tokens=True)
         if is_conversational(inputs[0]):
-            completions = [
-                [{"role": "assistant", "content": completion}]
-                for completion in completions
-            ]
+            completions = [[{"role": "assistant", "content": completion}]for completion in completions]
 
         # Compute the rewards
         rewards_per_func = torch.zeros(

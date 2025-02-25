@@ -11,4 +11,4 @@ checkpoints
 outputs
 playground
 wandb
-vllm_run.txt
+logs

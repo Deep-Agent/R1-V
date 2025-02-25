@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+import debugpy
 import torch
 from datasets import load_dataset, load_from_disk
 from math_verify import parse, verify
@@ -24,6 +25,15 @@ from math_verify import parse, verify
 # from math_verify import parse, verify
 from open_r1.trainer import Qwen2VLGRPOTrainer, Qwen2VLGRPOVLLMTrainer
 from trl import GRPOConfig, ModelConfig, ScriptArguments, TrlParser, get_peft_config
+
+# try:
+#     # 5678 is the default attach port in the VS Code debug configurations. Unless a host and port are specified, host defaults to 127.0.0.1
+#     debugpy.listen(("localhost", 9501))
+#     print("Waiting for debugger attach")
+#     debugpy.wait_for_client()
+# except Exception as e:
+#     pass
+
 
 
 @dataclass
