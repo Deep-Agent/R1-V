@@ -1,0 +1,9 @@
+pyproject.toml
+ocr_r1.egg-info/PKG-INFO
+ocr_r1.egg-info/SOURCES.txt
+ocr_r1.egg-info/dependency_links.txt
+ocr_r1.egg-info/requires.txt
+ocr_r1.egg-info/top_level.txt
+trainer/__init__.py
+trainer/grpo_trainer.py
+trainer/vllm_grpo_trainer.py

@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ocr_r1"
+version = "0.0.1"
+description = ""
+readme = "README.md"
+requires-python = ">=3.11.0"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+]
+
+dependencies = [
+    "torch==2.4.1", 
+    "torchvision==0.19.1",
+    "transformers==4.46.3", 
+    "tokenizers==0.20.1", 
+    "sentencepiece==0.1.99", 
+    "shortuuid",
+    "accelerate==1.0.1", 
+    "peft", 
+    "bitsandbytes",
+    "pydantic", 
+    "markdown2[all]", 
+    "numpy", 
+    "scikit-learn==1.2.2",
+    "gradio==4.16.0", 
+    "gradio_client==0.8.1",
+    "requests", 
+    "httpx==0.24.0", 
+    "uvicorn", 
+    "fastapi",
+    "einops==0.6.1", 
+    "einops-exts==0.0.4", 
+    "timm==1.0.10",
+    "deepspeed==0.15.4", 
+    "ninja", 
+    "wandb",
+    "fvcore",
+    "loguru",
+    "datasets",
+    "sacrebleu",
+    "evaluate",
+    "sqlitedict",
+    "tenacity",
+    "hf_transfer",
+    "pytablewriter"
+]
+
+[project.optional-dependencies]
+standalone = [
+    "shortuuid",
+    "httpx==0.24.0",
+    "einops",
+    "ftfy",
+]
+
+build = ["build", "twine"]
+
+[tool.setuptools.packages.find]
+exclude = ["assets*", "benchmark*", "docs", "dist*", "playground*", "scripts*", "tests*"]
+
+[tool.wheel]
+exclude = ["assets*", "benchmark*", "docs", "dist*", "playground*", "scripts*", "tests*"]

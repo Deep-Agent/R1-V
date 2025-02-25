@@ -21,7 +21,6 @@ from pathlib import Path
 
 from setuptools import find_packages, setup
 
-
 # Remove stale open_r1.egg-info directory to avoid https://github.com/pypa/pip/issues/5466
 stale_egg_info = Path(__file__).parent / "open_r1.egg-info"
 if stale_egg_info.exists():
@@ -107,12 +106,12 @@ install_requires = [
 ]
 
 setup(
-    name="r1-v",
-    version="0.1.0",  # expected format is one of x.y.z.dev0, or x.y.z.rc1 or x.y.z (no to dashes, yes to dots)
-    author="The r1-v team and the Hugging Face team (past and future)",
-    description="R1-V",
+    name="ocr-r1",
+    version="0.0.1",  # expected format is one of x.y.z.dev0, or x.y.z.rc1 or x.y.z (no to dashes, yes to dots)
+    author="",
+    description="",
     license="Apache",
-    url="https://github.com/Deep-Agent/R1-V",
+    url="",
     package_dir={"": "src"},
     packages=find_packages("src"),
     zip_safe=False,

@@ -1,0 +1,49 @@
+Metadata-Version: 2.2
+Name: ocr_r1
+Version: 0.0.1
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: Apache Software License
+Requires-Python: >=3.11.0
+Description-Content-Type: text/markdown
+Requires-Dist: torch==2.4.1
+Requires-Dist: torchvision==0.19.1
+Requires-Dist: transformers==4.46.3
+Requires-Dist: tokenizers==0.20.1
+Requires-Dist: sentencepiece==0.1.99
+Requires-Dist: shortuuid
+Requires-Dist: accelerate==1.0.1
+Requires-Dist: peft
+Requires-Dist: bitsandbytes
+Requires-Dist: pydantic
+Requires-Dist: markdown2[all]
+Requires-Dist: numpy
+Requires-Dist: scikit-learn==1.2.2
+Requires-Dist: gradio==4.16.0
+Requires-Dist: gradio_client==0.8.1
+Requires-Dist: requests
+Requires-Dist: httpx==0.24.0
+Requires-Dist: uvicorn
+Requires-Dist: fastapi
+Requires-Dist: einops==0.6.1
+Requires-Dist: einops-exts==0.0.4
+Requires-Dist: timm==1.0.10
+Requires-Dist: deepspeed==0.15.4
+Requires-Dist: ninja
+Requires-Dist: wandb
+Requires-Dist: fvcore
+Requires-Dist: loguru
+Requires-Dist: datasets
+Requires-Dist: sacrebleu
+Requires-Dist: evaluate
+Requires-Dist: sqlitedict
+Requires-Dist: tenacity
+Requires-Dist: hf_transfer
+Requires-Dist: pytablewriter
+Provides-Extra: standalone
+Requires-Dist: shortuuid; extra == "standalone"
+Requires-Dist: httpx==0.24.0; extra == "standalone"
+Requires-Dist: einops; extra == "standalone"
+Requires-Dist: ftfy; extra == "standalone"
+Provides-Extra: build
+Requires-Dist: build; extra == "build"
+Requires-Dist: twine; extra == "build"
