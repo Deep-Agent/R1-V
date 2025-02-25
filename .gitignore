@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 __pycache__
 *.pyc
 *.egg-info
@@ -8,10 +7,8 @@ dist
 *.jsonl
 
 Geo170K
-=======
->>>>>>> 8548d64 (ocr_r1 train 250225)
 checkpoints
 outputs
 playground
 wandb
-logs
+vllm_run.txt
