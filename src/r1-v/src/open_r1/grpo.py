@@ -18,18 +18,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset
 from math_verify import parse, verify
 from open_r1.trainer import Qwen2VLGRPOTrainer, Qwen2VLGRPOVLLMTrainer
-from transformers import Qwen2VLForConditionalGeneration
-from trl import (
-    GRPOConfig,
-    GRPOTrainer,
-    ModelConfig,
-    ScriptArguments,
-    TrlParser,
-    get_peft_config,
-)
+from trl import GRPOConfig, ModelConfig, ScriptArguments, TrlParser, get_peft_config
 
 
 @dataclass
@@ -60,7 +52,6 @@ def accuracy_reward(completions, solution, **kwargs):
     """Reward function that checks if the completion is correct using either symbolic verification or exact string matching."""
     contents = [completion[0]["content"] for completion in completions]
     rewards = []
-    current_time = datetime.now().strftime("%d-%H-%M-%S-%f")
     for content, sol in zip(contents, solution):
         reward = 0.0
         # Try symbolic verification first
@@ -77,19 +68,20 @@ def accuracy_reward(completions, solution, **kwargs):
                 # Extract answer from solution if it has think/answer tags
                 sol_match = re.search(r'<answer>(.*?)</answer>', sol)
                 ground_truth = sol_match.group(1).strip() if sol_match else sol.strip()
-                
+
                 # Extract answer from content if it has think/answer tags
                 content_match = re.search(r'<answer>(.*?)</answer>', content)
                 student_answer = content_match.group(1).strip() if content_match else content.strip()
-                
+
                 # Compare the extracted answers
                 if student_answer == ground_truth:
                     reward = 1.0
             except Exception:
                 pass  # Keep reward as 0.0 if both methods fail
-                
+
         rewards.append(reward)
         if os.getenv("DEBUG_MODE") == "true":
+            current_time = datetime.now().strftime("%d-%H-%M-%S-%f")
             log_path = os.getenv("LOG_PATH")
             # local_rank = int(os.getenv("LOCAL_RANK", 0))
             with open(log_path, "a", encoding='utf-8') as f:
@@ -136,20 +128,6 @@ def main(script_args, training_args, model_args):
             ],
         }
 
-    # def make_conversation_image(example):
-    #     return {
-    #         "prompt": [
-    #             {"role": "system", "content": [{"type": "text", "text": SYSTEM_PROMPT}]},
-    #             {
-    #                 "role": "user",
-    #                 "content": [
-    #                     {"type": "image"},
-    #                     {"type": "text", "text": example["problem"]},
-    #                 ],
-    #             },
-    #         ],
-    #     }
-
     QUESTION_TEMPLATE = "{Question}  Output the thinking process in <think> </think> and final answer (number) in <answer> </answer> tags."
 
     def make_conversation_image(example):
@@ -175,6 +153,8 @@ def main(script_args, training_args, model_args):
         dataset = dataset.map(make_conversation)
         dataset = dataset.remove_columns("messages")
 
+    # print(dataset['train'][0])
+    # return
     
     trainer_cls = Qwen2VLGRPOTrainer if not training_args.use_vllm else Qwen2VLGRPOVLLMTrainer
     print("using: ", trainer_cls)

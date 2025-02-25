@@ -9,7 +9,7 @@ from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
 
 model_path = "checkpoints/Qwen/VL/Qwen2-VL-2B-Instruct" # qwen2vl model or grpoed model on geoqa train
 batch_size = 64
-output_path = "./outputs/train@geo170k/eval/res@qwen2_vl_2b.json"
+output_path = "./outputs/train@geo170k/eval/res@qwen2_vl_2b-2.json"
 prompt_path = "./src/eval/prompts/geoqa_test_prompts.jsonl"
 image_path = "./playground"
 
