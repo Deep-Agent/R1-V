@@ -1,172 +1,107 @@
-import base64
-import io
 import json
 import os
 
-import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
+from datasets import Dataset, DatasetDict, Features
+from datasets import Image as ImageFeature
+from datasets import Value
+from huggingface_hub import HfApi
 from PIL import Image
 from tqdm import tqdm
 
 
-def convert_json_to_parquet(input_json_path, output_parquet_path, images_dir=None):
+def convert_json_to_huggingface(json_path, image_base_dir=None):
     """
-    将SP-DocVQA JSON数据转换为Huggingface兼容的Parquet文件
+    Convert a JSON file to a Huggingface dataset.
     
-    参数:
-    input_json_path (str): 输入JSON文件的路径
-    output_parquet_path (str): 输出Parquet文件的路径
-    images_dir (str, optional): 图像文件夹的根目录路径，如果为None，则假设使用JSON中的完整路径
+    Args:
+        json_path (str): Path to the JSON file.
+        image_base_dir (str, optional): Base directory for images. If None, assumes image paths in JSON are absolute.
     
-    返回:
-    None
+    Returns:
+        Dataset: A Huggingface dataset.
     """
-    # 确保输出目录存在
-    output_dir = os.path.dirname(output_parquet_path)
-    if output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # 读取原始JSON文件
-    with open(input_json_path, 'r', encoding='utf-8') as f:
+    # Load JSON data
+    with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
-    # 准备数据列表
-    records = []
+    # Transform data structure
+    transformed_data = []
     
     for item in tqdm(data):
-        # 构建图像路径
+        # Get image path
+    # for i in range(100):
+        # item = data[i]
         image_path = item['image']
-        if images_dir:
-            image_path = os.path.join(images_dir, image_path)
+        if image_base_dir:
+            image_path = os.path.join(image_base_dir, image_path)
         
-        try:
-            # 读取图像并转换为字节
-            img = Image.open(image_path)
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_bytes = img_byte_arr.getvalue()
-            
-            # 将答案格式化为所需格式
-            answers = item['answers']
-            if isinstance(answers, list):
-                # 使用第一个答案或合并多个答案
-                formatted_answer = f"<answer> {answers[0]} </answer>"
-            else:
-                formatted_answer = f"<answer> {answers} </answer>"
-            
-            # 创建记录
-            record = {
-                'image': img_bytes,
-                'problem': item['question'],
-                'solution': formatted_answer
-            }
-            
-            records.append(record)
-            
-        except Exception as e:
-            print(f"处理图像 {image_path} 时出错: {str(e)}")
-    
-    # 创建DataFrame
-    df = pd.DataFrame(records)
-    
-    # 将DataFrame转换为Parquet文件
-    table = pa.Table.from_pandas(df)
-    pq.write_table(table, output_parquet_path)
-    
-    print(f"转换完成! 已将数据保存到: {output_parquet_path}")
-    print(f"共处理 {len(records)} 条记录")
-
-# 另一种实现方式: 使用datasets库直接创建Huggingface数据集
-def create_hf_dataset(input_json_path, output_dir, images_dir=None):
-    """
-    创建Huggingface兼容的数据集
-    
-    参数:
-    input_json_path (str): 输入JSON文件的路径
-    output_dir (str): 输出数据集目录
-    images_dir (str, optional): 图像文件夹的根目录路径
-    
-    返回:
-    datasets.Dataset: Huggingface数据集对象
-    """
-    try:
-        from datasets import Dataset, Features
-        from datasets import Image as HFImage
-        from datasets import Value
-    except ImportError:
-        print("请先安装datasets库: pip install datasets")
-        return None
-    
-    # 读取原始JSON文件
-    with open(input_json_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    # 准备数据
-    image_paths = []
-    problems = []
-    solutions = []
-    
-    for item in data['data']:
-        # 构建图像路径
-        image_path = item['image']
-        if images_dir:
-            image_path = os.path.join(images_dir, image_path)
+        # Ensure the image path exists
+        if not os.path.exists(image_path):
+            print(f"Warning: Image path does not exist: {image_path}")
+            continue
         
-        # 将答案格式化为所需格式
-        answers = item['answers']
-        if isinstance(answers, list):
-            formatted_answer = f"<answer> {answers[0]} </answer>"
-        else:
-            formatted_answer = f"<answer> {answers} </answer>"
+        # Load image using PIL
+        image = Image.open(image_path)
         
-        image_paths.append(image_path)
-        problems.append(item['question'])
-        solutions.append(formatted_answer)
+        # Take only the first answer
+        answer = item['answers'][0]
+        
+        # Create new data structure
+        transformed_item = {
+            'image': image,
+            'problem': item['question'],
+            'solution': f'<answer> {answer} </answer>'
+        }
+        
+        transformed_data.append(transformed_item)
     
-    # 创建初始数据集
-    dataset_dict = {
-        'image_path': image_paths,
-        'problem': problems,
-        'solution': solutions
-    }
-    
-    # 创建数据集
-    dataset = Dataset.from_dict(dataset_dict)
-    
-    # 加载图像
+    # Create Huggingface dataset
     features = Features({
-        'image': HFImage(),
+        'image': ImageFeature(),
         'problem': Value('string'),
         'solution': Value('string')
     })
     
-    # 将路径转换为图像output
-    def load_image(example):
-        try:
-            example['image'] = example['image_path']
-            return example
-        except Exception as e:
-            print(f"加载图像 {example['image_path']} 时出错: {str(e)}")
-            return example
+    dataset = Dataset.from_list(transformed_data, features=features)
+    dataset_dict = DatasetDict({'train': dataset})
+    return dataset_dict
+
+def save_dataset(dataset, output_dir, to_hub=False, **kwargs):
+    """
+    Save the dataset to disk.
     
-    dataset = dataset.cast_column('image_path', HFImage())
-    dataset = dataset.rename_column('image_path', 'image')
-    
-    # 保存数据集
+    Args:
+        dataset (Dataset): Huggingface dataset to save.
+        output_dir (str): Directory to save the dataset.
+    """
     dataset.save_to_disk(output_dir)
     
-    print(f"已创建Huggingface数据集并保存到: {output_dir}")
-    return dataset
+    if to_hub:
+        api = HfApi()
+        api.create_repo(repo_id=repo_name, repo_type="dataset", exist_ok=True)
+        
+        # Upload the dataset
+        dataset.push_to_hub(repo_name)
+        print(f"Dataset pushed to https://huggingface.co/datasets/{repo_name}")
+        
+        print("\nTo load this dataset:")
+        print(f"from datasets import load_dataset")
+        print(f"dataset = load_dataset('{repo_name}')")
+        print("data = dataset['train'][0]")
+    
+    
+# push_to_hub(dataset_dict, "your-username/your-dataset-name", "your-hf-token")
 
-# 使用示例
+# Example usage
 if __name__ == "__main__":
-    input_file = "playground/DocVQA/simplified_train.json"
-    output_file = "playground/DocVQA/sample.parquet"
-    images_folder = "playground/DocVQA"  # 图像文件夹的根目录
+    # Example paths (modify as needed)
+    json_path = "playground/DocVQA/simplified_train.json"
+    image_base_dir = "playground/DocVQA"  # Set to None if image paths are absolute
+    output_dir = "playground/DocVQA-R1"
     
-    # 方法1: 生成Parquet文件
-    convert_json_to_parquet(input_file, output_file, images_folder)
+    # Convert data
+    dataset = convert_json_to_huggingface(json_path, image_base_dir)
     
-    # 方法2: 创建Huggingface数据集
-    # create_hf_dataset(input_file, "output/docvqa_dataset", images_folder)
+    # Save dataset
+    save_dataset(dataset, output_dir)
+    # save_dataset(dataset, output_dir, to_hub=True, repo_name="OCR_R1_test")
