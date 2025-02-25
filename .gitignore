@@ -6,5 +6,3 @@ outputs
 playground
 wandb
 vllm_run.txt
-
-src/scripts
