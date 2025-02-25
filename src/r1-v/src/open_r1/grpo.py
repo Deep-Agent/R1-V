@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from math_verify import parse, verify
 from open_r1.trainer import Qwen2VLGRPOTrainer, Qwen2VLGRPOVLLMTrainer
 from trl import GRPOConfig, ModelConfig, ScriptArguments, TrlParser, get_peft_config
@@ -117,7 +117,10 @@ def main(script_args, training_args, model_args):
     reward_funcs = [reward_funcs_registry[func] for func in script_args.reward_funcs]
 
     # Load the dataset
-    dataset = load_dataset(script_args.dataset_name, name=script_args.dataset_config)
+    try:
+        dataset = load_dataset(script_args.dataset_name, name=script_args.dataset_config)
+    except:
+        dataset = load_from_disk(script_args.dataset_name)
 
     # Format into conversation
     def make_conversation(example):
@@ -144,12 +147,12 @@ def main(script_args, training_args, model_args):
         }
 
     if "image" in dataset[script_args.dataset_train_split].features:
-        print("has image in dataset")
+        # print("has image in dataset")
         dataset = dataset.map(make_conversation_image)  # Utilize multiprocessing for faster mapping
         # dataset = dataset.remove_columns(["original_question", "original_answer"])
 
     else:
-        print("no image in dataset")
+        # print("no image in dataset")
         dataset = dataset.map(make_conversation)
         dataset = dataset.remove_columns("messages")
 
@@ -157,7 +160,7 @@ def main(script_args, training_args, model_args):
     # return
     
     trainer_cls = Qwen2VLGRPOTrainer if not training_args.use_vllm else Qwen2VLGRPOVLLMTrainer
-    print("using: ", trainer_cls)
+     #print("using: ", trainer_cls)
 
     # Initialize the GRPO trainer
     trainer = trainer_cls(

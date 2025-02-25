@@ -12,7 +12,7 @@ MIN_PIXELS="200704"
 # 1280*28*28
 MAX_PIXELS="1003520"
 
-OUTPUT_DIR=outputs
+OUTPUT_DIR=outputs/vllm_run_test_7
 export LOG_PATH="./logs/vllm_run_test_7.txt"
 RUN_NAME=ocr1_test_8
 
@@ -25,11 +25,11 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc_per_node="3" \
     --output_dir $OUTPUT_DIR \
     --model_name_or_path $MODEL_PATH \
     --dataset_name $DATA_PATH \
-    --max_prompt_length 2048 \
-    --max_completion_length 2048 \
+    --max_prompt_length 4096 \
+    --max_completion_length 4096 \
     --temperature 1.0 \
     --num_generations 6 \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 2 \
     --logging_steps 1 \
     --bf16  \
