@@ -67,7 +67,7 @@ def accuracy_reward(completions, solution, **kwargs):
                 content_match = re.search(r'<answer>(.*?)</answer>', content)
                 student_answer = content_match.group(1).strip() if content_match else content.strip()
                 # Compare the extracted answers
-                if student_answer == ground_truth:
+                if student_answer.lower() == ground_truth.lower():
                     reward = 1.0
             except Exception:
                 pass  # Keep reward as 0.0 if both methods fail
@@ -76,11 +76,10 @@ def accuracy_reward(completions, solution, **kwargs):
         if os.getenv("DEBUG_MODE") == "true":
             current_time = datetime.now().strftime("%d-%H-%M-%S-%f")
             log_path = os.getenv("LOG_PATH")
-            # local_rank = int(os.getenv("LOCAL_RANK", 0))
             with open(log_path, "a", encoding='utf-8') as f:
                 f.write(f"------------- {current_time} Accuracy reward: {reward} -------------\n")
-                f.write(f"Content: {content}\n")
-                f.write(f"Solution: {sol}\n")
+                f.write(f"Content: {content.strip()}\n")
+                f.write(f"Solution: {sol.strip()}\n")
                 f.write(f"--------------------------------------------------------------------\n")
                 f.write(f"\n")
                 
@@ -113,6 +112,7 @@ def rank0_print(*args, **kwargs):
     if rank == 0:
         print(*args, **kwargs)
 
+
 def main(script_args, training_args, model_args):
     # Get reward functions
     reward_funcs = [reward_funcs_registry[func] for func in script_args.reward_funcs]
@@ -121,7 +121,7 @@ def main(script_args, training_args, model_args):
     try:
         dataset = load_dataset(script_args.dataset_name, name=script_args.dataset_config)
     except:
-        dataset = load_from_disk(script_args.dataset_name, name=script_args.dataset_config)
+        dataset = load_from_disk(script_args.dataset_name)
 
     # Format into conversation
     def make_conversation(example):
@@ -156,7 +156,10 @@ def main(script_args, training_args, model_args):
         rank0_print("no image in dataset")
         dataset = dataset.map(make_conversation)
         dataset = dataset.remove_columns("messages")
-
+        
+    # rank0_print("dataset: ", dataset['train'][0])
+    # return
+    
     trainer_cls = Qwen2VLGRPOTrainer if not training_args.use_vllm else Qwen2VLGRPOVLLMTrainer
     rank0_print("using: ", trainer_cls)
 

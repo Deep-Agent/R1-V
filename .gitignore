@@ -1,4 +1,10 @@
-lighteval-4f381b352c0e467b5870a97d41cb66b487a2c503
+__pycache__
+*.pyc
+*.egg-info
+dist
+
+*.json
+*.jsonl
 
 Geo170K
 checkpoints
