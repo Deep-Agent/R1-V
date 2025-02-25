@@ -24,6 +24,11 @@
 
 4. The training was conducted on 8 A100 GPUs for **30 minutes, costing $2.62**.
 
+**Blogs:**
+
+
+[🎯 RLVR in Vision Language Models: Findings, Questions and Directions](https://deepagent.notion.site/rlvr-in-vlms)
+
 **Resources:** 
 
 [🤗 R1V Training Dataset: CLEVR-70k-Counting](https://huggingface.co/datasets/leonardPKU/clevr_cogen_a_train)
@@ -50,6 +55,7 @@
 
 ### Updates
 
+- 2025-02-21: We write a [blog post](https://deepagent.notion.site/rlvr-in-vlms) summarizing the main findings and questions in our visual RLVR experimetns, check it out!
 - 2025-02-12: We fixed the batched decoding error. The orignial RL training scirpt now is 3x speeded up.
 - 2025-02-12: R1-V now supports vLLM to accelerate training (`pip install vllm==0.7.2` before use) and SFT.
 - 2025-02-11: R1-V now supports Qwen2.5-VL and [GEOQA](https://arxiv.org/abs/2312.11370) task.
@@ -63,12 +69,10 @@
 
 ---
 
-
 ![Image](https://github.com/user-attachments/assets/e86a3ff2-a9c6-4548-8200-6c3c382d60e6)
 
 ![Image](https://github.com/user-attachments/assets/b3512920-ef30-4d6d-9bfe-c64e4570a067)
-
-![image](https://github.com/user-attachments/assets/42b79f44-1c09-4c22-bad9-17ec2a0a1d10)
+*Note: In our later experiment, we found that letting the 2b base model directly output the result instead of following `<think></think><answer></answer>` would lead to a much higher score (86%) on SuperClevr. It suggests that enforcing Chain-of-Thought reasoning may be not only unnecessary but potentially detrimental to the 2B model performance.*
 
 ![image](https://github.com/user-attachments/assets/f5191b1e-dde2-42b7-9ec9-10f7f6213c12)
 
@@ -81,6 +85,10 @@ conda activate r1-v
 
 bash setup.sh
 ```
+
+> [!NOTE] 
+> If you meet bug when running the script, first try align your environments with `./src/requirements.txt`
+
 
 ### Supported Models
 
