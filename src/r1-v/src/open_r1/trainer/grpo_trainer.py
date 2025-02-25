@@ -177,21 +177,9 @@ class Qwen2VLGRPOTrainer(Trainer):
         model_init_kwargs["attn_implementation"] = attn_implementation
         if isinstance(model, str):
             model_id = model
-            torch_dtype = model_init_kwargs.get("torch_dtype")
-            if isinstance(torch_dtype, torch.dtype) or torch_dtype == "auto" or torch_dtype is None:
-                pass  # torch_dtype is already a torch.dtype or "auto" or None
-            elif isinstance(torch_dtype, str):  # it's a str, but not "auto"
-                torch_dtype = getattr(torch, torch_dtype)
-                model_init_kwargs["torch_dtype"] = torch_dtype
-            else:
-                raise ValueError(
-                    "Invalid `torch_dtype` passed to `GRPOConfig`. Expected either 'auto' or a string representing "
-                    f"a `torch.dtype` (e.g., 'float32'), but got {torch_dtype}."
-                )
             # Disable caching if gradient checkpointing is enabled (not supported)
-            model_init_kwargs["use_cache"] = (
-                False if args.gradient_checkpointing else model_init_kwargs.get("use_cache")
-            )
+            model_init_kwargs["torch_dtype"] = torch.bfloat16 if args.bf16 else None
+            model_init_kwargs["use_cache"] = (False if args.gradient_checkpointing else model_init_kwargs.get("use_cache"))
             if "Qwen2-VL" in model_id:
                 model = Qwen2VLForConditionalGeneration.from_pretrained(model, **model_init_kwargs)
             elif "Qwen2.5-VL" in model_id:
