@@ -4,13 +4,7 @@ export WANDB_PROJECT="ocr_r1"
 export DEBUG_MODE="true"
 
 TIMESTAMP=$(date '+%y%m%d_%H%M%S')
-BASE_NAME="Qwen25VL_7B@DocVQA@${TIMESTAMP}"
-try=1
-while [ -e "./logs/${BASE_NAME}@${try}.txt" ]; do
-  ((try++))
-done
-PROJECT_NAME="${BASE_NAME}@${try}"
-
+PROJECT_NAME="Qwen25VL_7B@DocVQA@${TIMESTAMP}"
 
 MODEL_PATH=checkpoints/Qwen/VL/Qwen2.5-VL-7B-Instruct
 # MODEL_PATH=checkpoints/Qwen/VL/Qwen2-VL-2B-Instruct
@@ -21,9 +15,9 @@ MIN_PIXELS="100352"
 # 576*28*28
 MAX_PIXELS="451584"
 
-RUN_NAME=$PROJECT_NAME 
-OUTPUT_DIR=$PROJECT_NAME
-export LOG_PATH="./logs/${PROJECT_NAME}.txt"
+RUN_NAME=$PROJECT_NAME
+OUTPUT_DIR="outputs/${PROJECT_NAME}"
+export LOG_PATH="logs/${PROJECT_NAME}.txt"
 
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --nproc_per_node="8" \
     --nnodes="1" \
@@ -48,7 +42,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --nproc_per_node="8" \
     --max_pixels $MAX_PIXELS \
     --max_steps 13125 \
     --run_name $RUN_NAME \
-    --save_steps 1000 \
+    --save_steps 100 \
     --save_only_model true \
     --deepspeed src/scripts/zero3.json \
     # --use_vllm True \

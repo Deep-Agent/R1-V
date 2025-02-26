@@ -11,4 +11,6 @@ checkpoints
 outputs
 playground
 wandb
-vllm_run.txt
+logs
+
+Qwen25VL_7B@DocVQA@250225_170751
